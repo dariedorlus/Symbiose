@@ -34,17 +34,19 @@ namespace Symbiose.Mail.Services
     }
 
     ///<inheritdoc cref="IEmailService"/>
-    public class EmailService: IEmailService
+    public class EmailService : IEmailService
     {
         private IEmailRepository repo;
-        private IDeliverEmail mailDeliveryService;
-        private ILogger<EmailService> logger; 
+        private IMailgunService mailgunService;
+        private ISendgridService sendgridService;
+        private ILogger<EmailService> logger;
 
-        public EmailService(IEmailRepository repo, IDeliverEmail mailDeliveryService, ILogger<EmailService> logger)
+        public EmailService(IEmailRepository repo, ILogger<EmailService> logger, IMailgunService mailgunService, ISendgridService sendgridService)
         {
             this.repo = repo;
-            this.mailDeliveryService = mailDeliveryService;
             this.logger = logger;
+            this.mailgunService = mailgunService;
+            this.sendgridService = sendgridService;
         }
 
         public async Task<Email> GetEmailById(string id)
@@ -59,20 +61,26 @@ namespace Symbiose.Mail.Services
                 return null;
             }
 
-            email.BodyText = ConvertHtmlToText(email.BodyHtml); 
-            email.IsSent = await mailDeliveryService.SendEmail(email);
+            email.BodyText = ConvertHtmlToText(email.BodyHtml);
+            email.IsSent = await mailgunService.SendEmail(email);
+
+            if (!email.IsSent)
+            {
+                email.IsSent = await sendgridService.SendEmail(email);
+            }
+
             email.CreatedDate = email.UpdatedDate = DateTime.Now;
-         
+
             return await repo.InsertOneEntity(email);
 
         }
 
-        
+
 
         public async Task<IEnumerable<Email>> GetAllEmails()
         {
             var res = await repo.GetAll();
-            return res.AsEnumerable(); 
+            return res.AsEnumerable();
         }
 
         private string ConvertHtmlToText(string html)
@@ -92,7 +100,7 @@ namespace Symbiose.Mail.Services
             {
                 sb.Append(node.InnerText);
             }
-            
+
             return sb.ToString();
         }
 

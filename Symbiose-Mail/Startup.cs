@@ -29,9 +29,9 @@ namespace Symbiose.Mail
         {
             services.AddControllers()
                 .AddJsonOptions(options =>
-                    {
-                        options.JsonSerializerOptions.PropertyNamingPolicy = SnakeCaseNamingPolicy.Instance;
-                    });
+                {
+                    options.JsonSerializerOptions.PropertyNamingPolicy = SnakeCaseNamingPolicy.Instance;
+                });
 
             services.AddSwaggerGen(c =>
             {
@@ -40,20 +40,8 @@ namespace Symbiose.Mail
 
             services.AddScoped<IEmailRepository, EmailRepository>();
             services.AddScoped<IEmailService, EmailService>();
-           
-
-
-            var mailgunOptions = Configuration.GetSection(MailgunConfigOptions.Mailgun).Get<MailgunConfigOptions>();
-
-            if (mailgunOptions.Enabled)
-            {
-                services.AddHttpClient<IDeliverEmail, MailgunService>();
-            }
-            else
-            {
-                services.AddHttpClient<IDeliverEmail, SendgridService>();
-            }
-
+            services.AddHttpClient<IMailgunService, MailgunService>();
+            services.AddHttpClient<ISendgridService, SendgridService>();
             services.AddDbContext<AppDbContext>(options =>
                     options.UseInMemoryDatabase(Configuration.GetValue<string>("DatabaseName")));
         }

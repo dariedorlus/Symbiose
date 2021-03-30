@@ -14,11 +14,12 @@ using Symbiose.Mail.Services;
 namespace Symbiose.Test.Unit
 {
 
-    
-    public class EmailServiceTest: TestBase
+
+    public class EmailServiceTest : TestBase
     {
         private IEmailRepository repo;
-        private IDeliverEmail mailDeliveryService;
+        private IMailgunService mailgunService;
+        private ISendgridService sendgridService;
         private ILogger<EmailService> logger;
         private Email email;
         private EmailService sut;
@@ -27,22 +28,23 @@ namespace Symbiose.Test.Unit
         public void Setup()
         {
             repo = A.Fake<IEmailRepository>();
-            mailDeliveryService = A.Fake<IDeliverEmail>();
-            logger = A.Fake<ILogger<EmailService>>(); 
+            mailgunService = A.Fake<IMailgunService>();
+            sendgridService = A.Fake<ISendgridService>();
+            logger = A.Fake<ILogger<EmailService>>();
             email = fixture.Create<Email>();
             email.BodyHtml = string.Concat("<body>", email.BodyHtml, "<body/>");
-            sut = new EmailService(repo, mailDeliveryService, logger);
+            sut = new EmailService(repo, logger, mailgunService, sendgridService);
 
         }
 
         [Test]
-        public async Task ProcessEmail_Success()
+        public async Task ProcessEmail_MailGun_Success()
         {
             //Arrange
             email.IsSent = false;
-            A.CallTo(() => mailDeliveryService.SendEmail(email)).Returns(true);
+            A.CallTo(() => mailgunService.SendEmail(email)).Returns(true);
             A.CallTo(() => repo.InsertOneEntity(email)).Returns(email);
-            
+
             //Act
             var result = await sut.ProcessEmail(email);
 
@@ -51,17 +53,39 @@ namespace Symbiose.Test.Unit
             result.BodyHtml.Should().Contain(email.BodyText);
             result.CreatedDate.Should().Be(result.UpdatedDate);
 
-            A.CallTo(() => mailDeliveryService.SendEmail(email)).MustHaveHappenedOnceExactly();
+            A.CallTo(() => mailgunService.SendEmail(email)).MustHaveHappenedOnceExactly();
             A.CallTo(() => repo.InsertOneEntity(email)).MustHaveHappenedOnceExactly();
         }
 
+        [Test]
+        public async Task ProcessEmail_Sendgrid_Success()
+        {
+            //Arrange
+            email.IsSent = false;
+            A.CallTo(() => mailgunService.SendEmail(email)).Returns(false);
+            A.CallTo(() => sendgridService.SendEmail(email)).Returns(true);
+            A.CallTo(() => repo.InsertOneEntity(email)).Returns(email);
+
+            //Act
+            var result = await sut.ProcessEmail(email);
+
+            //Assert
+            result.IsSent.Should().BeTrue();
+            result.BodyHtml.Should().Contain(email.BodyText);
+            result.CreatedDate.Should().Be(result.UpdatedDate);
+
+            A.CallTo(() => mailgunService.SendEmail(email)).MustHaveHappenedOnceExactly();
+            A.CallTo(() => sendgridService.SendEmail(email)).MustHaveHappenedOnceExactly();
+            A.CallTo(() => repo.InsertOneEntity(email)).MustHaveHappenedOnceExactly();
+        }
 
         [Test]
         public async Task ProcessEmail_EmailNotSent()
         {
             //Arrange
             email.IsSent = true;
-            A.CallTo(() => mailDeliveryService.SendEmail(email)).Returns(false);
+            A.CallTo(() => mailgunService.SendEmail(email)).Returns(false);
+            A.CallTo(() => sendgridService.SendEmail(email)).Returns(false);
             A.CallTo(() => repo.InsertOneEntity(email)).Returns(email);
 
             //Act
@@ -69,9 +93,10 @@ namespace Symbiose.Test.Unit
 
             //Assert
             result.IsSent.Should().BeFalse();
-         
 
-            A.CallTo(() => mailDeliveryService.SendEmail(email)).MustHaveHappenedOnceExactly();
+
+            A.CallTo(() => mailgunService.SendEmail(email)).MustHaveHappenedOnceExactly();
+            A.CallTo(() => sendgridService.SendEmail(email)).MustHaveHappenedOnceExactly();
             A.CallTo(() => repo.InsertOneEntity(email)).MustHaveHappenedOnceExactly();
         }
 
@@ -79,15 +104,13 @@ namespace Symbiose.Test.Unit
         public async Task ProcessEmail_Validation(Email newEmail)
         {
             //Arrange
-            
+
             //Act
             var result = await sut.ProcessEmail(newEmail);
 
             //Assert
             result.Should().BeNull();
-            // A.CallTo(() => logger.LogError(A<string>._)).MustHaveHappenedOnceExactly();
-            A.CallTo(() => mailDeliveryService.SendEmail(A<Email>._)).MustNotHaveHappened();
-            A.CallTo(() => repo.InsertOneEntity(A<Email>._)).MustNotHaveHappened();
+
 
         }
 
@@ -109,7 +132,7 @@ namespace Symbiose.Test.Unit
             email = fixture.Create<Email>();
             email.From = String.Empty;
             yield return email;
-            
+
             email = fixture.Create<Email>();
             email.FromName = String.Empty;
             yield return email;
