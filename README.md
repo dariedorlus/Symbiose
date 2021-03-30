@@ -51,12 +51,16 @@ Alternatively, the `V2` branch uses both mail delivery systems automatically.
 
     4. FakeItEasy and FluentAssertion to mock and make tests read like a sentence. The tests then become a living document.  
 
+    5. HtmlAgilityPack - To parse html into text.
+
 ### Tradeoffs, Improvements, and more
 
 - **Tradeoffs:**  
     1. For serializing DTO into json, my goto lib is NewtonSoft.Json (Json.Net). It's such a convenient and powerful lib that microsoft used to ship it with .NET Core up until the current version. While Json.Net is convenient, the .NET team created a lighter and faster serializer. Though I lost some of the features, and I had to do a little manual work, the performance is 2x which can be crucial at scale.  
 
     2. I use a service and repository layer. It would have been much faster given the scope of the project to let the controller access data context and send these emails directly. Having everything segregated that much longer to develop, but makes it much better to maintain and change things down the line.  
+
+    3. I use HtmlAgility Pack to stip html tags of the email body instead of Regex. Though the agility pack has a bigger footprint, it's well supported, mature, and well tested. It also supports malform html fairly well. I could arguably have written a fairly performant regex, but this seemed to be good compromise.
 
 - **Improvements:**  
     1. I would add both authentication and rate limits on the system. Depending on the load this service is expected to handle, I would have the service return 203 Accepted (as opposed to 201) with location discovery (currently implemented). That way users can check the status of their post.
